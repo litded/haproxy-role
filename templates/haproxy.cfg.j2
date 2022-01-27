@@ -1,0 +1,108 @@
+global
+  log /dev/log  local0
+  log /dev/log  local1 notice
+{% if haproxy_socket != '' %}
+  stats socket {{ haproxy_socket }} level admin
+{% endif %}
+{% if haproxy_chroot != '' %}
+  chroot {{ haproxy_chroot }}
+{% endif %}
+  user {{ haproxy_user }}
+  group {{ haproxy_group }}
+  daemon
+{% for global_var in haproxy_global_vars %}
+  {{ global_var }}
+{% endfor %}
+
+defaults
+  log     global
+  maxconn 20000
+  mode    http
+  http-reuse safe
+  balance roundrobin
+  option  splice-auto
+
+  option  dontlognull
+  option  forwardfor
+  option http-server-close
+  retries 3
+  option redispatch
+  timeout client 600s
+  timeout http-keep-alive 2s
+  timeout http-request 15s
+  timeout connect 15s
+  timeout server 600s
+  timeout queue 5s
+  timeout check 5s
+  stats enable
+  stats refresh 5s
+  stats hide-version
+  stats uri /haproxy-status
+  monitor-uri /ww-monitor
+
+frontend stats
+   bind *:8404
+   option http-use-htx
+   http-request use-service prometheus-exporter if { path /metrics }
+   stats enable
+   stats uri /stats
+   stats refresh 10s
+
+{% for userlist in haproxy_userlists | default([]) %}
+userlist {{ userlist.name }}
+{% for user in userlist.users | default([]) %}
+  user {{ user.name }} insecure-password {{ user.password }}
+{% endfor %}
+{% endfor %}
+
+frontend http-in
+  mode    http
+  option  httplog
+  bind *:80
+  bind *:443 ssl {{ ssl_crt }} 
+# Redirect 80 to 443
+  # redirect scheme https code 301 if !{ ssl_fc }
+
+  http-request set-header X-Forwarded-Port %[dst_port]
+  http-request add-header X-Forwarded-Proto https if { ssl_fc }
+
+  acl internal src {{ acl_internal }}
+
+{% for server in haproxy_servers %}
+{% for acl_host in server.hosts_hdr | default([]) %}
+  acl {{ server.name }} hdr(host) -i {{ acl_host }}
+{% endfor %}
+{% for acl_host in server.hosts_hdr_end | default([]) %}
+  acl {{ server.name }} hdr_end(host) -i {{ acl_host }}
+{% endfor %}
+{% for acl_host in server.hosts_hdr_beg | default([]) %}
+  acl {{ server.name }} hdr_beg(host) -i {{ acl_host }}
+{% endfor %}
+
+# custom frontend
+{{ server.custom_frontend | default("") }}
+
+{% endfor %}
+
+{% for server in haproxy_servers %}
+use_backend {{server.name}}_backend if {{ server.name }}{% if server.internal | default(false) %} internal{% endif %}
+
+{% endfor %}
+
+{% for server in haproxy_servers %}
+backend {{server.name}}_backend
+  mode http
+  balance roundrobin
+  option forwardfor
+{% for backend in server.backend_servers %}
+  server {{ backend.name }} {{ backend.address }} check inter 5s
+{% endfor %}
+# auth section
+{% if server.auth is defined %}
+  http-request auth unless { http_auth({{ server.auth }}) }
+{% endif %}
+
+# custom backend
+{{ server.custom_backend | default("") }}
+
+{% endfor %}
