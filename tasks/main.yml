@@ -1,8 +1,8 @@
 ---
-- name: Add buster-backports repository 
-  ansible.builtin.apt_repository:
-    repo: deb http://deb.debian.org/debian buster-backports main
-    update_cache: true
+# - name: Add buster-backports repository 
+#   ansible.builtin.apt_repository:
+#     repo: deb http://deb.debian.org/debian buster-backports main
+#     update_cache: true
 
 
 
