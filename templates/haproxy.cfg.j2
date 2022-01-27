@@ -34,19 +34,6 @@ defaults
   timeout server 600s
   timeout queue 5s
   timeout check 5s
-  stats enable
-  stats refresh 5s
-  stats hide-version
-  stats uri /haproxy-status
-  monitor-uri /ww-monitor
-
-frontend stats
-   bind *:8404
-   option http-use-htx
-   http-request use-service prometheus-exporter if { path /metrics }
-   stats enable
-   stats uri /stats
-   stats refresh 10s
 
 {% for userlist in haproxy_userlists | default([]) %}
 userlist {{ userlist.name }}
