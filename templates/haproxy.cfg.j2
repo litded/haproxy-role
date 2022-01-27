@@ -59,14 +59,14 @@ frontend http-in
   mode    http
   option  httplog
   bind *:80
-  bind *:443 ssl { ssl_crt } 
+  bind *:443 ssl {{ ssl_crt }} 
 # Redirect 80 to 443
   # redirect scheme https code 301 if !{ ssl_fc }
 
   http-request set-header X-Forwarded-Port %[dst_port]
   http-request add-header X-Forwarded-Proto https if { ssl_fc }
 
-  acl internal src { acl_internal }
+  acl internal src {{ acl_internal }}
 
 {% for server in haproxy_servers %}
 {% for acl_host in server.hosts_hdr | default([]) %}
