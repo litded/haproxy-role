@@ -9,7 +9,7 @@
 - name: Ensure HAProxy is installed.
   apt:
     package: haproxy
-    default_release: buster-backports
+    # default_release: buster-backports
     state: latest
 
 - name: Ensure HAProxy is enabled (so init script will start it on Debian).
